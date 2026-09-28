@@ -232,6 +232,36 @@ if page == '🔍 单案例预测':
             p_a = float(row['mole_frac_a'])
         else:
             p_a = st.slider('组分 A 摩尔分数 p_A', 0.01, 0.99, 0.5, 0.001)
+            # 动态可信度提示
+            fracs_sorted = sub.sort_values('mole_frac_a')['mole_frac_a'].values
+            r_names = sub.sort_values('mole_frac_a')['ray'].values
+            if p_a < min(fracs_sorted) or p_a > max(fracs_sorted):
+                level = ('red', '❌ 外推区域',
+                         '当前比例超出论文 R1–R5 实验范围，无数据支撑，预测仅供方向性参考。')
+            else:
+                idx = np.searchsorted(fracs_sorted, p_a)
+                if idx <= 1 or idx >= len(fracs_sorted) - 1:
+                    level = ('orange', '⚠️ 边缘区域',
+                             f'当前比例接近 {r_names[max(0, idx-1)]}（{fracs_sorted[max(0, idx-1)]:.3f}），'
+                             f'属边缘预测，内插 R²≈0.72，可信度中等。')
+                else:
+                    r_lo, r_hi = r_names[idx-1], r_names[idx]
+                    f_lo, f_hi = fracs_sorted[idx-1], fracs_sorted[idx]
+                    level = ('green', '✅ 高可信度',
+                             f'当前比例落在 {r_lo}({f_lo:.3f})–{r_hi}({f_hi:.3f}) 之间，'
+                             f'属内插预测，内插 R²≈0.85，可信度高。')
+            color_map = {
+                'green': ('#2e7d32', '#e8f5e9'),
+                'orange': ('#ef6c00', '#fff3e0'),
+                'red': ('#c62828', '#ffebee')
+            }
+            fg, bg = color_map[level[0]]
+            st.markdown(
+                f'<div style="background:{bg};border-left:4px solid {fg};'
+                f'padding:10px 14px;border-radius:6px;margin:8px 0;">'
+                f'<span style="color:{fg};font-weight:600;">{level[1]}</span>'
+                f'<span style="color:#424242;font-size:13px;margin-left:8px;">{level[2]}</span>'
+                f'</div>', unsafe_allow_html=True)
         time_h = st.select_slider('暴露时间 t (h)', TIMES, value=8)
 
     a, b = combo.split('-')
